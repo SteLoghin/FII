@@ -1,0 +1,1 @@
+select * from studenti s join note n on s.id=n.id where s.id=5;

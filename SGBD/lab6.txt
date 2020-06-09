@@ -1,0 +1,86 @@
+create or replace function medie_student(pi_nume_student in studenti.nume%type,
+                                         pi_prenume_student in studenti.prenume%type)
+    return varchar2
+as
+    counter integer;
+    mesaj   varchar2(32000);
+    medie   number(5, 2);
+    student_inexistent exception;
+    pragma exception_init (student_inexistent,-20001);
+    student_fara_note exception;
+    pragma exception_init ( student_fara_note,-20002 );
+begin
+    select count(*) into counter from studenti where nume = pi_nume_Student and prenume = pi_prenume_student;
+    if counter = 0 then
+        raise student_inexistent;
+    else
+        select count(*)
+        into counter
+        from studenti s
+                 join note n on s.ID = n.ID_STUDENT
+        where nume = pi_nume_student
+          and prenume = pi_prenume_student;
+        if counter = 0 then
+            raise student_fara_note;
+        else
+            select avg(n.valoare)
+            into medie
+            from studenti s
+                     join note n on s.ID = n.ID_STUDENT
+            where nume = pi_nume_student
+              and PRENUME = pi_prenume_student;
+            mesaj := 'Studentul:' || pi_nume_student || ' ' || pi_prenume_student || ' are media:' || medie;
+        end if;
+    end if;
+    return mesaj;
+EXCEPTION
+    when student_inexistent then
+        raise_application_error(-20001, 'Acest student nu exista in baza de date');
+    when student_fara_note then
+        raise_application_error(-20002, 'Acest student nu are note');
+end medie_student;
+
+
+
+select MEDIE_STUDENT('Mihailescu', 'Laura')
+FROM DUAL;
+
+-- acest bloc anonim va avea 3 output-uri diferite
+declare
+    type nume is table of studenti.nume%type;
+    student1 nume;
+    type prenume is table of studenti.prenume%type;
+    student2 prenume;
+    mesaj    varchar2(32000);
+begin
+    student1 := nume('Mihailescu', 'Pantiruc', 'Iovu');
+    student2 := prenume('Laura', 'Nicusor', 'Sabina');
+    for i in 1..student1.COUNT
+        loop
+            mesaj := medie_student(student1(i), student2(i));
+            dbms_output.put_line(mesaj);
+        end loop;
+end;
+
+set serveroutput on;
+
+-- acest bloc anonim va genera o exceptie user-defined. In SQL Developer se intampla asta
+-- dar in DataGrip se vor afisa primele 3 apeluri de functii iar apoi se va afisa si exceptia.
+declare
+    type nume is table of studenti.nume%type;
+    student1 nume;
+    type prenume is table of studenti.prenume%type;
+    student2 prenume;
+    mesaj    varchar2(32000);
+begin
+    student1 := nume('Mihailescu', 'Pantiruc', 'Iovu', 'Sporescu', 'Bogdan', 'Spataru');
+    student2 := prenume('Laura', 'Nicusor', 'Sabina', 'Ludmila', 'Bogdan', 'Nicusor');
+    for i in 1..student1.COUNT
+        loop
+            mesaj := medie_student(student1(i), student2(i));
+            dbms_output.put_line(mesaj);
+        end loop;
+end;
+
+
+alter table note add constraint un_valoare_curs unique(id_student,id_curs);

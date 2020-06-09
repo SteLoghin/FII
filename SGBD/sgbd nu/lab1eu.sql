@@ -1,0 +1,3 @@
+BEGIN
+    DBMS_OUTPUT.PUT_LINE('Ieri:' || (SYSDATE -1));
+END;

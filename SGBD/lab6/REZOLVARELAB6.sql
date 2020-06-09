@@ -1,0 +1,170 @@
+
+--metoda1
+create or replace procedure incercare(in_id_student studenti.id%type)
+as
+    mesaj   varchar2(32000) := 'Studentul are deja nota la aceasta materie';
+    counter integer;
+    v_index integer;
+begin
+    select count(*)
+    into counter
+    from note n
+             join cursuri c on n.ID_CURS = c.ID
+    where n.ID_STUDENT = in_id_student
+      and c.ID = 1;
+    if counter = 0 then
+        for v_index in 1..100000 -- a doua iteratie va sista programul
+            LOOP
+                dbms_output.PUT_LINE('hahahahah');
+                insert into note (id, id_student, id_curs, valoare)
+                select seq_ins_note.nextval,
+                       in_id_student,
+                       (select id from cursuri where titlu_curs = 'Logicã'),
+                       10
+                from dual;
+            end loop;
+    else
+        dbms_output.PUT_LINE(mesaj);
+    end if;
+end;
+
+begin
+    incercare(12);
+end;
+
+
+---metoda2
+CREATE OR REPLACE PROCEDURE insereaza_fara_cout(IN_ID STUDENTI.id%type) as
+    v_index INTEGER;
+    NOTA_EXISTENTA EXCEPTION;
+    counter INTEGER;
+    PRAGMA EXCEPTION_INIT (NOTA_EXISTENTA, -20013);
+    student_inexistent EXCEPTION;
+    PRAGMA EXCEPTION_INIT (student_inexistent, -20001);
+
+BEGIN
+    SELECT COUNT(*) INTO counter FROM studenti WHERE id = IN_id;
+    IF counter = 0 THEN
+        raise student_inexistent;
+    ELSE
+        FOR v_index IN 1..1000000
+            LOOP
+             select count(*)
+                INTO counter
+                from note n
+                         join cursuri c on n.ID_CURS = c.ID
+                where c.id = 1
+                  and n.ID_STUDENT = IN_ID;
+             IF counter = 1 THEN
+                    raise NOTA_EXISTENTA;
+
+                end if;
+                insert into note (id, id_student, id_curs, valoare)
+                select seq_ins_note.nextval,
+                       IN_ID,
+                       (select id from cursuri where id = 1),
+                       10
+                from dual;
+            end loop;
+
+    end if;
+EXCEPTION
+    WHEN student_inexistent THEN
+        raise_application_error (-20001,'Studentul cu ID-ul ' || IN_ID || ' nu exista in baza de date.');
+    WHEN NOTA_EXISTENTA THEN
+        raise_application_error (-20013,'Studentul cu ID-ul ' || IN_ID || ' are deja o nota.');
+
+end;
+
+set serveroutput on;
+
+begin
+    INSEREAZA_FARA_COUT(20);
+end;
+
+
+
+
+
+
+------------problema1
+create or replace function medie_student(pi_nume_student in studenti.nume%type,
+                                         pi_prenume_student in studenti.prenume%type)
+    return varchar2
+as
+    counter integer;
+    mesaj   varchar2(32000);
+    medie   number(5, 2);
+    student_inexistent exception;
+    pragma exception_init (student_inexistent,-20001);
+    student_fara_note exception;
+    pragma exception_init ( student_fara_note,-20002 );
+begin
+    select count(*) into counter from studenti where nume = pi_nume_Student and prenume = pi_prenume_student;
+    if counter = 0 then
+        raise student_inexistent;
+    else
+        select count(*)
+        into counter
+        from studenti s
+                 join note n on s.ID = n.ID_STUDENT
+        where nume = pi_nume_student
+          and prenume = pi_prenume_student;
+        if counter = 0 then
+            raise student_fara_note;
+        else
+            select avg(n.valoare)
+            into medie
+            from studenti s
+                     join note n on s.ID = n.ID_STUDENT
+            where nume = pi_nume_student
+              and PRENUME = pi_prenume_student;
+            mesaj := 'Studentul:' || pi_nume_student || ' ' || pi_prenume_student || ' are media:' || medie;
+        end if;
+    end if;
+    return mesaj;
+EXCEPTION
+    when student_inexistent then
+        raise_application_error(-20001, 'Acest student nu exista in baza de date');
+    when student_fara_note then
+        raise_application_error(-20002, 'Acest student nu are note');
+end medie_student;
+
+
+
+select MEDIE_STUDENT('Mihailescu', 'Laura')
+FROM DUAL;
+
+-- acest bloc anonim va avea 3 output-uri diferite
+declare
+    type nume is table of studenti.nume%type;
+    student1 nume;
+    type prenume is table of studenti.prenume%type;
+    student2 prenume;
+    mesaj    varchar2(32000);
+begin
+    student1 := nume('Mihailescu', 'Pantiruc', 'Iovu');
+    student2 := prenume('Laura', 'Nicusor', 'Sabina');
+    for i in 1..student1.COUNT
+        loop
+            mesaj := medie_student(student1(i), student2(i));
+            dbms_output.put_line(mesaj);
+        end loop;
+end;
+
+set serveroutput on;
+
+-- acest bloc anonim va genera o exceptie user-defined. In SQL Developer se intampla asta
+-- dar in DataGrip se vor afisa primele 3 apeluri de functii iar apoi se va afisa si exceptia.
+declare
+    type nume is table of studenti.nume%type;
+    student1 nume:=('Sporescu', 'Bogdan', 'Spataru','Georgescu','Spataru');
+    type prenume is table of studenti.prenume%type;
+    student2 prenume:=('Laura', 'Nicusor', 'Sabina', 'Ludmila', 'Bogdan', 'Nicusor');
+begin
+    for i in 1..student1.COUNT
+        loop
+            mesaj := medie_student(student1(i), student2(i));
+            dbms_output.put_line(mesaj);
+        end loop;
+end;
